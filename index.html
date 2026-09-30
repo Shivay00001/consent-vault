@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>ConsentVault — U-PERM live demo</title>
+<style>
+:root{
+  --bg:#0b0e14; --panel:#121826; --panel2:#0d1220; --line:#1e2a40;
+  --txt:#dbe4f0; --dim:#8b98ad; --green:#34d399; --red:#f87171; --red2:#b91c1c;
+  --amber:#fbbf24; --cyan:#22d3ee; --violet:#a78bfa;
+  --mono:ui-monospace,'Cascadia Code','SF Mono',Menlo,Consolas,'Liberation Mono',monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Inter,Arial,sans-serif;
+  min-height:100vh;display:flex;flex-direction:column}
+.mono{font-family:var(--mono)}
+code{font-family:var(--mono);background:#1a2336;padding:1px 6px;border-radius:4px;font-size:.85em;color:var(--cyan)}
+
+/* flash overlay for the REVOKE ALL moment */
+#flashOverlay{position:fixed;inset:0;background:rgba(220,38,38,.28);opacity:0;
+  pointer-events:none;transition:opacity .18s;z-index:99}
+#flashOverlay.on{opacity:1}
+
+header.top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;
+  padding:22px 24px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+header.top h1{margin:0;font-size:1.7rem;letter-spacing:.5px}
+header.top h1 .tag{font-size:.75rem;vertical-align:middle;background:#132032;color:var(--cyan);
+  border:1px solid #1d3a52;border-radius:20px;padding:3px 10px;margin-left:10px;font-weight:500}
+.sub{color:var(--dim);margin:8px 0 0;max-width:760px;line-height:1.5;font-size:.95rem}
+.invariants{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.invariants span{font-family:var(--mono);font-size:.72rem;color:var(--dim);
+  border:1px solid var(--line);border-radius:4px;padding:3px 8px;background:var(--panel2);cursor:help}
+.invariants span:hover{color:var(--cyan);border-color:#1d3a52}
+
+.revoke-all{font-size:1.15rem;font-weight:800;letter-spacing:1px;color:#fff;
+  background:linear-gradient(180deg,#dc2626,#991b1b);border:1px solid #ef4444;border-radius:10px;
+  padding:16px 34px;cursor:pointer;align-self:center;white-space:nowrap}
+.revoke-all:not(:disabled){box-shadow:0 0 22px rgba(248,113,113,.45);animation:pulse 2s infinite}
+.revoke-all:disabled{opacity:.35;cursor:not-allowed;animation:none;box-shadow:none}
+.revoke-all:not(:disabled):hover{filter:brightness(1.15)}
+@keyframes pulse{0%,100%{box-shadow:0 0 14px rgba(248,113,113,.35)}50%{box-shadow:0 0 30px rgba(248,113,113,.7)}}
+
+.banner{background:linear-gradient(90deg,#7f1d1d,#b91c1c);color:#fff;font-weight:700;
+  padding:12px 20px;text-align:center;letter-spacing:.3px;font-size:1.02rem}
+.banner.hidden{display:none}
+
+main.grid{flex:1;display:grid;grid-template-columns:330px minmax(0,1fr) 370px;gap:16px;
+  padding:18px 24px;align-items:start}
+@media (max-width:1080px){main.grid{grid-template-columns:1fr}}
+
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;min-width:0}
+.panel h2{margin:0 0 4px;font-size:1.08rem;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.panel h2 .ghost{margin:0}
+.hint{color:var(--dim);font-size:.82rem;margin:0 0 14px;line-height:1.5}
+.dim{color:var(--dim)}
+.subh{margin:18px 0 10px;font-size:.92rem;color:var(--dim);text-transform:uppercase;letter-spacing:1px}
+
+.flabel{display:block;font-size:.85rem;margin:14px 0 6px;color:var(--dim)}
+select,input[type=text]{width:100%;background:var(--panel2);border:1px solid var(--line);
+  color:var(--txt);border-radius:8px;padding:10px;font-size:.92rem}
+select:focus,input[type=text]:focus{outline:none;border-color:var(--cyan)}
+
+button{font-family:inherit}
+.primary{width:100%;margin-top:16px;background:linear-gradient(180deg,#0e7490,#155e75);
+  border:1px solid #22d3ee;color:#fff;font-weight:700;font-size:1rem;border-radius:8px;
+  padding:12px;cursor:pointer}
+.primary:hover{filter:brightness(1.2)}
+.ghost{background:transparent;border:1px solid var(--line);color:var(--dim);
+  border-radius:6px;padding:5px 12px;font-size:.78rem;cursor:pointer;white-space:nowrap}
+.ghost:hover{color:var(--txt);border-color:var(--dim)}
+.danger{background:#2a1215;border:1px solid var(--red2);color:var(--red);
+  border-radius:6px;padding:6px 12px;font-size:.78rem;cursor:pointer;margin-top:10px}
+.danger:hover{background:#3d1518}
+.err{color:var(--red);font-size:.82rem;margin-top:8px;min-height:1.2em}
+
+/* grant builder resource rows */
+.resrow{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px;
+  background:var(--panel2);transition:border-color .15s}
+.resrow.on{border-color:#2b5a70}
+.rescheck{display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:600;font-size:.95rem}
+.rescheck input{accent-color:var(--cyan);width:16px;height:16px;cursor:pointer}
+.acts{display:flex;gap:8px;margin-top:8px}
+.pill{background:transparent;border:1px solid var(--line);color:var(--dim);border-radius:20px;
+  padding:4px 14px;font-size:.78rem;font-family:var(--mono);cursor:pointer}
+.pill.on{background:#0e3a46;border-color:var(--cyan);color:var(--cyan)}
+.pill:disabled{opacity:.3;cursor:not-allowed}
+
+/* grant cards */
+.grant-list{display:flex;flex-direction:column;gap:10px}
+.empty{font-size:.85rem;padding:10px 0}
+.gcard{border:1px solid #2b5a70;border-radius:10px;padding:12px;background:var(--panel2);position:relative}
+.gcard.revoked{border-color:var(--red2);opacity:.75}
+.gcard.expired{border-color:#5a4a1f;opacity:.75}
+.gtoken{font-size:.82rem;color:var(--violet);word-break:break-all}
+.gflow{margin:8px 0;font-size:.88rem}
+.gflow .arrow{color:var(--cyan);font-weight:700;margin:0 4px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.chip{font-size:.72rem;font-family:var(--mono);background:#132032;border:1px solid #1d3a52;
+  color:var(--cyan);border-radius:4px;padding:3px 8px}
+.gpurpose{font-size:.8rem;color:var(--dim);font-style:italic;margin-bottom:6px}
+.exp{font-size:.82rem;color:var(--dim)}
+.exp .cd{color:var(--amber);font-weight:700;font-size:.95rem}
+.stamp{display:inline-block;font-family:var(--mono);font-weight:800;letter-spacing:2px;
+  font-size:.85rem;border:2px solid;border-radius:6px;padding:3px 12px;margin:4px 0;transform:rotate(-3deg)}
+.stamp.revoked{color:var(--red);border-color:var(--red)}
+.stamp.expired{color:var(--amber);border-color:var(--amber)}
+
+/* agent feed */
+.onboard{background:#1a1408;border:1px solid #5a4a1f;color:var(--amber);border-radius:8px;
+  padding:10px 12px;font-size:.85rem;margin-bottom:12px}
+.onboard.hidden{display:none}
+.feed{display:flex;flex-direction:column;gap:6px;max-height:640px;overflow-y:auto}
+.frow{border-left:3px solid var(--line);background:var(--panel2);border-radius:0 8px 8px 0;
+  padding:8px 10px;font-size:.83rem;display:flex;flex-wrap:wrap;gap:6px 10px;align-items:baseline;
+  animation:slidein .25s ease-out}
+@keyframes slidein{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.frow.allow{border-left-color:var(--green)}
+.frow.deny{border-left-color:var(--red)}
+.fverb{font-family:var(--mono);font-weight:800;font-size:.75rem;letter-spacing:1px}
+.frow.allow .fverb{color:var(--green)}
+.frow.deny .fverb{color:var(--red)}
+.ftime{color:var(--dim);font-size:.75rem}
+.fdesc{color:var(--txt)}
+.freason{color:var(--dim);font-size:.72rem;flex-basis:100%;word-break:break-all}
+
+/* audit log */
+.audit{display:flex;flex-direction:column;gap:4px;max-height:640px;overflow-y:auto;font-size:.8rem}
+.arow{display:flex;gap:8px;align-items:baseline;background:var(--panel2);border-radius:6px;
+  padding:6px 9px;animation:slidein .25s ease-out}
+.atime{color:var(--dim);font-size:.72rem;white-space:nowrap}
+.abadge{font-family:var(--mono);font-size:.66rem;font-weight:800;letter-spacing:1px;
+  border-radius:4px;padding:2px 7px;white-space:nowrap}
+.abadge.grant{background:#123b2e;color:var(--green)}
+.abadge.allow{background:#123b2e;color:var(--green)}
+.abadge.deny{background:#3d1518;color:var(--red)}
+.abadge.expire{background:#3a2f10;color:var(--amber)}
+.abadge.revoke{background:#3d1518;color:var(--red)}
+.abadge.sys{background:#1a2336;color:var(--cyan)}
+.amsg{color:var(--txt);word-break:break-word;line-height:1.45}
+
+footer{border-top:1px solid var(--line);color:var(--dim);font-size:.8rem;text-align:center;
+  padding:14px 20px;font-family:var(--mono)}
+::-webkit-scrollbar{width:8px}
+::-webkit-scrollbar-thumb{background:#2a3a52;border-radius:4px}
+::-webkit-scrollbar-track{background:transparent}
+</style>
+</head>
+<body>
+<div id="flashOverlay"></div>
+
+<header class="top">
+  <div>
+    <h1>ConsentVault<span class="tag">U-PERM · live simulation</span></h1>
+    <p class="sub">You own a clinic. Your AI receptionist <code>agent 'recep-01'</code> is a
+    <b>guest</b> in your data — it holds no ambient authority. You mint it scoped,
+    time-bound <b>capability tokens</b>. Then, when you choose, you take them all back.</p>
+    <div class="invariants">
+      <span title="P1 — with no grant, no access is possible. Default stance is DENY.">P1 default-deny</span>
+      <span title="P2 — each grant is attenuated to named resources and actions only.">P2 attenuation</span>
+      <span title="P3 — every grant carries an expiry and dies on schedule.">P3 time-bounded</span>
+      <span title="P4 — one owner action revokes every outstanding capability instantly.">P4 total revocation</span>
+      <span title="P5 — every grant states its purpose in plain language.">P5 legible purpose</span>
+    </div>
+  </div>
+  <button id="revokeAllBtn" class="revoke-all" disabled title="Revoke every outstanding grant">⚠ REVOKE ALL</button>
+</header>
+
+<div id="banner" class="banner hidden" role="alert"></div>
+
+<main class="grid">
+  <!-- 1. GRANT BUILDER -->
+  <section class="panel" aria-label="Grant builder">
+    <h2>① Grant builder</h2>
+    <p class="hint">Capabilities are minted by you, the owner, and <b>attenuated</b> — each names
+    exact resources and actions. Nothing more.</p>
+    <div id="resRows"></div>
+
+    <label class="flabel" for="expirySel">Expiry <span class="dim">(P3 · time-bounded)</span></label>
+    <select id="expirySel">
+      <option value="60000">60 seconds — watch it die</option>
+      <option value="600000" selected>10 minutes</option>
+      <option value="86400000">1 day</option>
+    </select>
+
+    <label class="flabel" for="purposeInp">Purpose <span class="dim">(P5 · legible purpose)</span></label>
+    <input id="purposeInp" type="text" value="Handle appointment bookings" maxlength="120"/>
+
+    <button id="issueBtn" class="primary">Issue grant → mint capability token</button>
+    <div id="formErr" class="err"></div>
+
+    <h3 class="subh">Issued capability tokens <span id="grantCount"></span></h3>
+    <div id="grantList" class="grant-list"><div class="dim empty">No grants issued yet.</div></div>
+  </section>
+
+  <!-- 2. AGENT ACTIVITY -->
+  <section class="panel" aria-label="Agent activity">
+    <h2>② Agent activity <button id="simBtn" class="ghost">Pause</button></h2>
+    <p class="hint">Receptionist <code>agent 'recep-01'</code> attempts an action every ~2.5s.
+    Each attempt is checked against your <b>live</b> grants.</p>
+    <div id="denyHint" class="onboard">⚠ Issue a grant to let the agent work — right now every attempt is denied.</div>
+    <div id="feed" class="feed"></div>
+  </section>
+
+  <!-- 3. AUDIT LOG -->
+  <section class="panel" aria-label="Audit log">
+    <h2>③ Audit log <button id="copyBtn" class="ghost">Copy audit log</button></h2>
+    <p class="hint">Append-only. Every issue, allow, deny, expiry and revocation is recorded with a timestamp.</p>
+    <div id="audit" class="audit"></div>
+  </section>
+</main>
+
+<footer>Interactive simulation of the U-STACK U-PERM specification · No real data · VisionQuantech research demo</footer>
+
+<script>
+'use strict';
+/* ================= model ================= */
+var RESOURCES = [
+  { id:'appt-calendar',   label:'Appointments calendar' },
+  { id:'patient-records', label:'Patient records' },
+  { id:'billing-ledger',  label:'Billing ledger' }
+];
+var PHRASES = {
+  'appt-calendar|read':   'read appointments calendar',
+  'appt-calendar|write':  'book an appointment slot',
+  'patient-records|read': 'read a patient record',
+  'patient-records|write':'update a patient record',
+  'billing-ledger|read':  'read the billing ledger',
+  'billing-ledger|write': 'issue an invoice'
+};
+var ISSUER = 'clinic owner (you)';
+var HOLDER = "agent 'recep-01'";
+
+var grants = [];        // capability tokens
+var grantSeq = 0;
+var auditEntries = [];
+var simRunning = true, simTimer = null;
+
+/* ================= helpers ================= */
+function el(id){ return document.getElementById(id); }
+function stamp(d){ d = d || new Date(); return d.toLocaleTimeString('en-GB',{hour12:false}); }
+function rnd(n){ return Math.floor(Math.random()*n); }
+function hex(n){ var c='0123456789abcdef', s=''; for(var i=0;i<n;i++) s+=c[rnd(16)]; return s; }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+  .replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function fmtLeft(ms){
+  if (ms <= 0) return 'expired';
+  var s = Math.ceil(ms/1000);
+  var h = Math.floor(s/3600), m = Math.floor(s%3600/60), sec = s%60;
+  function p(n){ return (n<10?'0':'')+n; }
+  return h > 0 ? h+'h '+p(m)+'m' : p(m)+':'+p(sec);
+}
+function resLabel(id){
+  for (var i=0;i<RESOURCES.length;i++) if (RESOURCES[i].id===id) return RESOURCES[i].label;
+  return id;
+}
+function grantById(id){
+  for (var i=0;i<grants.length;i++) if (grants[i].id===id) return grants[i];
+  return null;
+}
+function liveGrants(){
+  var t = Date.now();
+  return grants.filter(function(g){ return g.status==='active' && t < g.expiresAt; });
+}
+function scopeSummary(g){
+  return g.scopes.map(function(s){ return resLabel(s.resource)+' ('+s.actions.join('/')+')'; }).join(', ');
+}
+
+/* ================= grant builder ================= */
+var builder = {};
+RESOURCES.forEach(function(r){ builder[r.id] = { checked:false, read:true, write:false }; });
+
+function renderBuilder(){
+  var html = '';
+  RESOURCES.forEach(function(r){
+    var b = builder[r.id];
+    html += '<div class="resrow'+(b.checked?' on':'')+'">'
+      + '<label class="rescheck"><input type="checkbox" data-res="'+r.id+'"'+(b.checked?' checked':'')+'/>'
+      + '<span>'+r.label+'</span></label>'
+      + '<div class="acts">'
+      + '<button type="button" class="pill'+(b.read?' on':'')+'" data-act="read" data-res="'+r.id+'"'+(b.checked?'':' disabled')+'>read</button>'
+      + '<button type="button" class="pill'+(b.write?' on':'')+'" data-act="write" data-res="'+r.id+'"'+(b.checked?'':' disabled')+'>write</button>'
+      + '</div></div>';
+  });
+  el('resRows').innerHTML = html;
+}
+
+el('resRows').addEventListener('change', function(ev){
+  var t = ev.target;
+  if (t && t.getAttribute('data-res') && t.type === 'checkbox'){
+    builder[t.getAttribute('data-res')].checked = t.checked;
+    renderBuilder();
+  }
+});
+el('resRows').addEventListener('click', function(ev){
+  var t = ev.target;
+  if (t && t.className.indexOf('pill') >= 0 && !t.disabled){
+    var b = builder[t.getAttribute('data-res')];
+    var act = t.getAttribute('data-act');
+    b[act] = !b[act];
+    renderBuilder();
+  }
+});
+
+function issueGrant(){
+  var err = el('formErr'); err.textContent = '';
+  var scopes = [];
+  RESOURCES.forEach(function(r){
+    var b = builder[r.id];
+    if (b.checked){
+      var acts = [];
+      if (b.read)  acts.push('read');
+      if (b.write) acts.push('write');
+      if (acts.length) scopes.push({ resource:r.id, actions:acts });
+    }
+  });
+  if (!scopes.length){
+    err.textContent = 'Select at least one resource with a read or write action.';
+    return;
+  }
+  var expiryMs = parseInt(el('expirySel').value, 10);
+  var purpose = el('purposeInp').value.trim() || 'Handle appointment bookings';
+  var g = {
+    id:'g'+(++grantSeq),
+    token:'u-perm_'+hex(12),
+    issuer:ISSUER, holder:HOLDER,
+    scopes:scopes, purpose:purpose,
+    issuedAt:Date.now(), expiresAt:Date.now()+expiryMs,
+    status:'active'
+  };
+  grants.push(g);
+  addAudit('GRANT','Issued '+g.id+' → '+HOLDER+' · '+scopeSummary(g)
+    +' · expires in '+fmtLeft(expiryMs)+' · purpose: "'+purpose+'"');
+  renderGrants();
+}
+
+/* ================= grant cards ================= */
+function grantCard(g){
+  var chips = g.scopes.map(function(s){
+    return '<span class="chip">'+resLabel(s.resource)+' · '+s.actions.join(' + ')+'</span>';
+  }).join('');
+  var stateLine, revokeBtn = '';
+  if (g.status === 'active'){
+    stateLine = '<div class="exp">expires in <span class="mono cd" data-cd="'+g.id+'">'
+      + fmtLeft(g.expiresAt - Date.now()) + '</span></div>';
+    revokeBtn = '<button type="button" class="danger" data-revoke="'+g.id+'">Revoke</button>';
+  } else {
+    stateLine = '<div class="stamp '+g.status+'">'+(g.status==='revoked'?'REVOKED':'EXPIRED')+'</div>';
+  }
+  return '<div class="gcard '+g.status+'">'
+    + '<div class="gtoken mono">'+g.token+'</div>'
+    + '<div class="gflow">'+esc(g.issuer)+'<span class="arrow">→</span>'+esc(g.holder)+'</div>'
+    + '<div class="chips">'+chips+'</div>'
+    + '<div class="gpurpose">purpose: “'+esc(g.purpose)+'”</div>'
+    + stateLine + revokeBtn + '</div>';
+}
+
+function renderGrants(){
+  var list = el('grantList');
+  if (!grants.length){
+    list.innerHTML = '<div class="dim empty">No grants issued yet.</div>';
+  } else {
+    list.innerHTML = grants.map(grantCard).join('');
+  }
+  el('grantCount').textContent = '('+grants.length+')';
+  el('revokeAllBtn').disabled = liveGrants().length === 0;
+}
+
+el('grantList').addEventListener('click', function(ev){
+  var t = ev.target;
+  if (t && t.getAttribute('data-revoke')) revokeGrant(t.getAttribute('data-revoke'));
+});
+
+function revokeGrant(id){
+  var g = grantById(id);
+  if (!g || g.status !== 'active') return;
+  g.status = 'revoked';
+  addAudit('REVOKE','Grant '+g.id+' revoked by owner — its capabilities died instantly (P4)');
+  renderGrants();
+}
+
+function revokeAll(){
+  var t = Date.now(), n = 0;
+  grants.forEach(function(g){
+    if (g.status === 'active' && t < g.expiresAt){ g.status = 'revoked'; n++; }
+  });
+  if (!n) return;
+  addAudit('REVOKE','⚠ REVOKE ALL — owner revoked '+n+' live grant(s). Agent capabilities: zero (P4)');
+  renderGrants();
+  el('flashOverlay').classList.add('on');
+  setTimeout(function(){ el('flashOverlay').classList.remove('on'); }, 550);
+  showBanner('All access revoked — agent is now blind.');
+}
+
+function showBanner(text){
+  var b = el('banner');
+  b.textContent = text;
+  b.classList.remove('hidden');
+  setTimeout(function(){ b.classList.add('hidden'); }, 6000);
+}
+
+/* ================= authorization (P1 default-deny) ================= */
+function authorize(resource, action){
+  var t = Date.now(), coveredButWrongAction = null;
+  for (var i=0;i<grants.length;i++){
+    var g = grants[i];
+    if (g.status !== 'active' || t >= g.expiresAt) continue;
+    for (var j=0;j<g.scopes.length;j++){
+      var s = g.scopes[j];
+      if (s.resource === resource){
+        if (s.actions.indexOf(action) >= 0) return { grant:g };
+        coveredButWrongAction = g;
+      }
+    }
+  }
+  if (coveredButWrongAction)
+    return { reason:'"'+action+'" not in grant scope — attenuation holds (P2)' };
+  if (liveGrants().length)
+    return { reason:'no live grant covers this resource — default-deny (P1)' };
+  if (grants.length)
+    return { reason:'all grants revoked or expired — default-deny (P1)' };
+  return { reason:'no grants issued — default-deny (P1)' };
+}
+
+/* ================= agent simulation ================= */
+function attempt(){
+  var r = RESOURCES[rnd(RESOURCES.length)].id;
+  var a = Math.random() < 0.65 ? 'read' : 'write';
+  var res = authorize(r, a);
+  var ok = !!res.grant;
+  var key = r+'|'+a;
+  var detail = ok ? ('via '+res.grant.id+' · '+res.grant.token) : res.reason;
+  var row = '<div class="frow '+(ok?'allow':'deny')+'">'
+    + '<span class="mono ftime">'+stamp()+'</span>'
+    + '<span class="fverb">'+(ok?'ALLOWED':'DENIED')+'</span>'
+    + '<span class="fdesc">'+esc(HOLDER)+' → '+esc(PHRASES[key])+'</span>'
+    + '<span class="freason mono">'+esc(detail)+'</span>'
+    + '</div>';
+  var feed = el('feed');
+  feed.insertAdjacentHTML('afterbegin', row);
+  while (feed.children.length > 80) feed.removeChild(feed.lastChild);
+  addAudit(ok?'ALLOW':'DENY',
+    (ok?'ALLOWED ':'DENIED ')+HOLDER+' → '+PHRASES[key]+' ('+detail+')');
+}
+
+function toggleSim(){
+  simRunning = !simRunning;
+  if (simRunning){ simTimer = setInterval(attempt, 2500); }
+  else { clearInterval(simTimer); }
+  el('simBtn').textContent = simRunning ? 'Pause' : 'Resume';
+}
+
+/* ================= audit log ================= */
+var TYPECLASS = { GRANT:'grant', ALLOW:'allow', DENY:'deny', EXPIRE:'expire', REVOKE:'revoke', SYSTEM:'sys' };
+function addAudit(type, msg){
+  var e = { ts:stamp(), type:type, msg:msg };
+  auditEntries.push(e);
+  if (auditEntries.length > 400) auditEntries.shift();
+  var d = document.createElement('div');
+  d.className = 'arow';
+  d.innerHTML = '<span class="mono atime">'+e.ts+'</span>'
+    + '<span class="abadge '+TYPECLASS[type]+'">'+type+'</span>'
+    + '<span class="amsg">'+esc(msg)+'</span>';
+  var a = el('audit');
+  a.insertBefore(d, a.firstChild);
+}
+
+function copyAudit(){
+  var text = auditEntries.map(function(e){ return '['+e.ts+'] '+e.type+' — '+e.msg; }).join('\n');
+  function done(ok){
+    el('copyBtn').textContent = ok ? 'Copied ✓' : 'Copy failed';
+    setTimeout(function(){ el('copyBtn').textContent = 'Copy audit log'; }, 1500);
+  }
+  function fallback(){
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta); ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch(e){}
+    document.body.removeChild(ta);
+    done(ok);
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(function(){ done(true); }, fallback);
+  } else { fallback(); }
+}
+
+/* ================= expiry ticker (P3) ================= */
+function updateHint(){
+  el('denyHint').classList.toggle('hidden', liveGrants().length > 0);
+}
+function tick(){
+  var t = Date.now(), changed = false;
+  grants.forEach(function(g){
+    if (g.status === 'active' && t >= g.expiresAt){
+      g.status = 'expired'; changed = true;
+      addAudit('EXPIRE','Grant '+g.id+' expired — its capabilities died on schedule (P3)');
+    }
+  });
+  if (changed) renderGrants();
+  var spans = document.querySelectorAll('[data-cd]');
+  for (var i=0;i<spans.length;i++){
+    var g = grantById(spans[i].getAttribute('data-cd'));
+    if (g) spans[i].textContent = fmtLeft(g.expiresAt - Date.now());
+  }
+  updateHint();
+}
+
+/* ================= init ================= */
+el('issueBtn').addEventListener('click', issueGrant);
+el('revokeAllBtn').addEventListener('click', revokeAll);
+el('simBtn').addEventListener('click', toggleSim);
+el('copyBtn').addEventListener('click', copyAudit);
+
+renderBuilder();
+renderGrants();
+updateHint();
+addAudit('SYSTEM','ConsentVault initialized — zero grants. Default-deny (P1): the agent is blind until you grant.');
+attempt();                       // first row immediately, no 2.5s wait
+simTimer = setInterval(attempt, 2500);
+setInterval(tick, 1000);
+</script>
+</body>
+</html>
