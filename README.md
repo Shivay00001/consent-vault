@@ -49,3 +49,7 @@ No build, no dependencies, no network. Either:
   and the audit log. No real data, no network calls, no storage beyond the page session.
 - Honest footer included in the page: *"Interactive simulation of the U-STACK U-PERM
   specification · No real data · VisionQuantech research demo"*.
+
+## Built by VisionQuantech
+
+Part of the [VisionQuantech](https://visionquantech.com/) AI automation studio. See [AI automation services](https://visionquantech.com/ai-automation-services) and [AI automation in the USA](https://visionquantech.com/ai-automation-usa).
